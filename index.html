@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>L’anniversaire de Sasou 🎂</title>
+<style>
+:root{--bg:#fff7f0;--card:#fff;--tx:#2b2230;--mut:#7a6d80;--ac:#e8508a;--bd:#f0dfe6}
+@media(prefers-color-scheme:dark){:root{--bg:#1c1620;--card:#2a2030;--tx:#f6eef8;--mut:#b5a6bb;--bd:#3d3045}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font-family:-apple-system,system-ui,Segoe UI,Roboto,sans-serif;padding-bottom:90px}
+section{max-width:760px;margin:0 auto;padding:18px 14px}h1,h2{margin:.2em 0}.c{text-align:center}.mut{color:var(--mut)}
+#hero{width:150px;height:150px;border-radius:50%;object-fit:cover;background:var(--bd);display:block;margin:10px auto}
+ol{padding-left:20px}li{margin:6px 0}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:16px;overflow:hidden;display:flex;flex-direction:column}
+.card img,.ph{width:100%;aspect-ratio:1;object-fit:cover;background:var(--bd);display:flex;align-items:center;justify-content:center;font-size:3rem}
+.b{padding:10px 12px;display:grid;gap:6px;flex:1;align-content:start}.b h3{margin:0;font-size:1rem}
+.taken{opacity:.6}a{color:var(--ac)}
+button{font:inherit;border:0;border-radius:12px;padding:10px 14px;background:var(--ac);color:#fff;font-weight:600;cursor:pointer}
+button.s{background:none;color:var(--ac);border:1px solid var(--ac)}button:disabled{opacity:.5}
+#bar{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--bd);padding:12px 14px calc(12px + env(safe-area-inset-bottom));display:none;justify-content:space-between;align-items:center}
+form{background:var(--card);border:1px solid var(--bd);border-radius:16px;padding:14px;display:grid;gap:10px;margin-bottom:16px}
+input{width:100%;padding:11px;border-radius:10px;border:1px solid var(--bd);background:var(--bg);color:var(--tx);font:inherit}
+</style></head><body>
+<section class="c"><img id="hero" alt=""><h1>🎂 L’anniversaire de Sasou 🎁</h1>
+<p class="mut" id="sub">psst… je ne vois pas qui offre quoi, promis.</p></section>
+<section id="how"><h2>En trois gestes</h2><ol><li><b>Choisis une envie</b></li><li><b>Ajoute-la au panier</b> (ou « Je l’offre »)</li><li><b>Réserve</b> : tous les liens pour acheter sont sur la carte</li></ol></section>
+<section><div id="own"></div><h2>Mes envies</h2><div id="list" class="grid"></div></section>
+<div id="bar"><span id="cnt"></span><button id="go">Réserver mon panier</button></div>
+<script>
+const $=s=>document.querySelector(s),esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const ls=(k,v)=>{try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(e){}};
+let me=ls("me");if(!me){me=crypto.randomUUID();ls("me",me)}
+let pw=sessionStorage.getItem("pw")||"",owner=false,gifts=[],cart=new Set();
+if(location.search.includes("moi")&&!pw){pw=prompt("Mot de passe Sasou :")||"";sessionStorage.setItem("pw",pw)}
+const H=()=>({"Content-Type":"application/json","x-owner":pw});
+async function load(){
+ const r=await fetch("/api/gifts?me="+me,{headers:H()}),j=await r.json();
+ gifts=j.gifts||[];owner=!!j.owner;
+ if(j.hero)$("#hero").src=j.hero;else $("#hero").style.display="none";
+ gifts.forEach(g=>{if(g.taken&&!g.mine)cart.delete(g.id)});render()}
+function render(){
+ if(owner){$("#how").style.display="none";$("#sub").textContent="Mode Sasou : tu ne vois jamais ce qui est réservé.";
+  $("#own").innerHTML=`<form id="f"><b>Ajouter un cadeau</b><input id="t" placeholder="Nom du cadeau" required><input id="u" type="url" placeholder="Lien d’achat"><input id="p" type="file" accept="image/*"><button>Ajouter</button><label class="mut">Ma photo d’accueil <input id="h" type="file" accept="image/*"></label></form>`;
+  $("#f").onsubmit=add;$("#h").onchange=async e=>{await post({hero:await shrink(e.target.files[0],400)});load()}}
+ $("#list").innerHTML=gifts.length?gifts.map(g=>{
+  let a="";if(owner)a=`<button class="s" data-d="${g.id}">Supprimer</button>`;
+  else if(g.mine)a=`<span class="mut">✅ Réservé par toi</span><button class="s" data-u="${g.id}">Annuler</button>`;
+  else if(g.taken)a=`<span class="mut">🔒 Pris par ${esc(g.name2)}</span>`;
+  else a=cart.has(g.id)?`<button class="s" data-r="${g.id}">Retirer du panier</button>`:`<button data-a="${g.id}">Ajouter au panier</button>`;
+  return `<div class="card ${g.taken&&!g.mine?"taken":""}">${g.img?`<img src="${g.img}" alt="">`:'<div class="ph">🎁</div>'}<div class="b"><h3>${esc(g.title)}</h3>${/^https?:\/\//.test(g.url)?`<a href="${esc(g.url)}" target="_blank" rel="noopener">Voir / acheter ↗</a>`:""}${a}</div></div>`}).join(""):'<p class="mut">La liste arrive bientôt…</p>';
+ $("#bar").style.display=!owner&&cart.size?"flex":"none";$("#cnt").textContent="🛒 "+cart.size}
+function shrink(f,m=700){return new Promise((ok,ko)=>{const i=new Image();i.onload=()=>{const r=Math.min(1,m/Math.max(i.width,i.height)),c=document.createElement("canvas");c.width=i.width*r;c.height=i.height*r;c.getContext("2d").drawImage(i,0,0,c.width,c.height);ok(c.toDataURL("image/jpeg",.72))};i.onerror=ko;i.src=URL.createObjectURL(f)})}
+const post=b=>fetch("/api/gifts",{method:"POST",headers:H(),body:JSON.stringify(b)}).then(r=>{if(!r.ok)alert("Action refusée (mot de passe ?)");return r});
+async function add(e){e.preventDefault();const f=$("#p").files[0];await post({title:$("#t").value,url:$("#u").value,img:f?await shrink(f):null});load()}
+document.addEventListener("click",async e=>{const b=e.target.closest("button"),d=b&&b.dataset;if(!b)return;
+ if(d.a){cart.add(d.a);render()}else if(d.r){cart.delete(d.r);render()}
+ else if(d.d&&confirm("Supprimer ?")){await fetch("/api/gifts",{method:"DELETE",headers:H(),body:JSON.stringify({id:d.d})});load()}
+ else if(d.u){await fetch("/api/reserve",{method:"DELETE",headers:H(),body:JSON.stringify({me,id:d.u})});load()}
+ else if(b.id==="go"){let n=ls("name")||prompt("Ton prénom (ou surnom) ? Les autres invités le verront, pas Sasou.");if(!n)return;ls("name",n);
+  const r=await(await fetch("/api/reserve",{method:"POST",headers:H(),body:JSON.stringify({me,name:n,ids:[...cart]})})).json();
+  cart.clear();await load();alert(`🎉 ${r.ok.length} réservé(s).`+(r.fail.length?` ${r.fail.length} déjà pris par quelqu’un d’autre.`:""))}});
+load();
+</script></body></html>
